@@ -3,7 +3,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-`auto-gen-tag` 是一个专注于自动创建和管理 Git 标签 的工具，用于简化发版操作流程。它通过识别最近的 Git 标签，并根据配置规则智能递增版本号，从而生成新的标签。
+`auto-gen-tag` 是一个创建 Git 标签 的工具，用于简化发版操作流程。它通过识别最近的 Git 标签，并根据配置规则智能递增版本号，从而生成新的标签。
 
 ## 📦 安装
 
