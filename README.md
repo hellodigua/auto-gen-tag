@@ -3,9 +3,7 @@
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 
-> 一个智能的 Git 标签自动生成工具，简化本地操作流程。
-
-`auto-gen-tag` 是一个专注于自动创建和管理 Git 标签 的工具，用于。它通过识别最近的 Git 标签，并根据配置规则智能递增版本号，从而生成新的标签。
+`auto-gen-tag` 是一个专注于自动创建和管理 Git 标签 的工具，用于简化发版操作流程。它通过识别最近的 Git 标签，并根据配置规则智能递增版本号，从而生成新的标签。
 
 ## 📦 安装
 
@@ -35,6 +33,35 @@ gt [配置模式] [版本类型]
 
 - **配置模式**：对应配置文件中 `tagPattern` 的键名（如 `default`、`test`）
 - **版本类型**：指定要递增的版本部分（`major`、`minor`、`patch`）
+
+## 配置
+
+### 配置文件
+
+在项目根目录创建 `.gentagrc` 或 `.gentagrc.json` 文件：
+
+```json
+{
+  "tagPattern": {
+    "default": "v${major}.${minor}.${patch}",
+    "test": "test-${major}.${minor}.${patch}",
+    "prod": "release-${major}.${minor}.${patch}",
+    "daily": "v${YYYYMMDD}",
+    "simple": "v${n}"
+  },
+  "autoPush": true
+}
+```
+
+### 环境变量
+
+也可以通过环境变量配置：
+
+```bash
+export GENTAG_PATTERN="v${major}.${minor}.${patch}"
+export GENTAG_INITIAL="v0.1.0"
+export GENTAG_AUTO_PUSH=false
+```
 
 ### 示例
 
@@ -81,35 +108,6 @@ gt list -v
 格式：`v${n}`
 
 示例演进：`v1` → `v2` → `v3`
-
-## 配置
-
-### 配置文件
-
-在项目根目录创建 `.gentagrc` 或 `.gentagrc.json` 文件：
-
-```json
-{
-  "tagPattern": {
-    "default": "v${major}.${minor}.${patch}",
-    "test": "test-${major}.${minor}.${patch}",
-    "prod": "release-${major}.${minor}.${patch}",
-    "daily": "v${YYYYMMDD}",
-    "simple": "v${n}"
-  },
-  "autoPush": true
-}
-```
-
-### 环境变量
-
-也可以通过环境变量配置：
-
-```bash
-export GENTAG_PATTERN="v${major}.${minor}.${patch}"
-export GENTAG_INITIAL="v0.1.0"
-export GENTAG_AUTO_PUSH=false
-```
 
 ## 其他命令选项
 
