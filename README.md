@@ -141,6 +141,23 @@ gt rm
 - **环境分离**：为测试和生产环境使用不同的标签前缀
 - **版本策略**：制定清晰的版本递增策略，何时递增主版本、次版本和补丁版本
 
+## Windows 系统使用说明
+
+如果遇到类似以下错误：
+
+```
+gt : 无法加载文件，因为在此系统上禁止运行脚本。
+```
+
+有两种解决方法：
+
+1. **临时解决方案**：使用 CMD 命令行（而非 PowerShell）运行 `gt` 命令
+
+2. **永久解决方案**：以管理员身份运行 PowerShell，执行以下命令放宽执行策略：
+   ```powershell
+   Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+   ```
+
 ## 📝 版本历史
 
 - **1.0.0**: 初始版本

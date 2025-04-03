@@ -1,8 +1,24 @@
 #!/usr/bin/env node
 
+// 确保Windows系统下能正确执行
+const isWindows = process.platform === "win32";
+
 const { program } = require("commander");
 const pkg = require("../package.json");
 const { createTag, listTags, loadConfig, removeTag } = require("../src/index");
+
+// 捕获Windows下可能出现的特定错误
+process.on("uncaughtException", (err) => {
+  if (isWindows && (err.code === "EPERM" || err.code === "EACCES")) {
+    console.error(
+      `错误: 没有足够的权限执行此操作。在Windows系统下，请尝试以管理员身份运行命令行。`
+    );
+    process.exit(1);
+  }
+  // 其他错误正常抛出
+  console.error(`错误: ${err.message}`);
+  process.exit(1);
+});
 
 // 加载配置
 const config = loadConfig();

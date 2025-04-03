@@ -7,11 +7,19 @@ const path = require("path");
 const fs = require("fs");
 const { execSync } = require("child_process");
 
+// 检测平台
+const isWindows = process.platform === "win32";
+
 // 加载环境变量
 dotenv.config();
 
-// Git 实例
-const git = simpleGit();
+// Git 实例 - 带有一些Windows特定的配置
+const gitOptions = {};
+if (isWindows) {
+  // 在Windows上，确保能正确处理路径等问题
+  gitOptions.binary = "git";
+}
+const git = simpleGit(gitOptions);
 
 // 默认配置
 const defaultConfig = {
@@ -451,15 +459,27 @@ async function displayTags(tags, verbose) {
  */
 async function getLatestCreatedTag() {
   try {
-    // 获取所有标签及其创建时间
-    const tagsOutput = execSync(
-      'git for-each-ref --sort=-creatordate --format="%(refname:short)" refs/tags/',
-      {
-        encoding: "utf-8",
-      }
-    ).trim();
+    let tags;
 
-    const tags = tagsOutput.split("\n").filter(Boolean);
+    try {
+      // 使用git命令获取所有标签及其创建时间
+      const cmd =
+        'git for-each-ref --sort=-creatordate --format="%(refname:short)" refs/tags/';
+      // 在Windows上特殊处理命令执行
+      const options = { encoding: "utf-8", windowsHide: true };
+      if (isWindows) {
+        options.shell = true;
+      }
+
+      const tagsOutput = execSync(cmd, options).trim();
+      tags = tagsOutput.split("\n").filter(Boolean);
+    } catch (shellError) {
+      console.error(`通过shell获取标签失败: ${shellError.message}`);
+      // 作为备选方案，使用simple-git获取标签
+      const tagsResult = await git.tags();
+      tags = tagsResult.all || [];
+    }
+
     return tags.length > 0 ? tags[0] : null;
   } catch (error) {
     console.error(`获取最新标签时出错: ${error.message}`);
