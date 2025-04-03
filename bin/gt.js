@@ -2,7 +2,7 @@
 
 const { program } = require("commander");
 const pkg = require("../package.json");
-const { createTag, listTags, loadConfig } = require("../src/index");
+const { createTag, listTags, loadConfig, removeTag } = require("../src/index");
 
 // 加载配置
 const config = loadConfig();
@@ -34,6 +34,20 @@ program
   .action(async (options) => {
     try {
       await listTags(options, config);
+    } catch (error) {
+      console.error(`错误: ${error.message}`);
+      process.exit(1);
+    }
+  });
+
+// 删除标签命令
+program
+  .command("rm")
+  .description("删除本地和远程的Git标签")
+  .argument("<tagName>", "要删除的标签名称")
+  .action(async (tagName) => {
+    try {
+      await removeTag(tagName, config);
     } catch (error) {
       console.error(`错误: ${error.message}`);
       process.exit(1);

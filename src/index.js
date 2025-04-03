@@ -445,8 +445,56 @@ async function displayTags(tags, verbose) {
   }
 }
 
+/**
+ * 删除本地和远程的Git标签
+ * @param {string} tagName 要删除的标签名称
+ * @param {Object} config 配置
+ */
+async function removeTag(tagName, config) {
+  // 检查是否是 Git 仓库
+  if (!(await isGitRepo())) {
+    throw new Error("当前目录不是 Git 仓库");
+  }
+
+  // 检查标签是否存在
+  if (!(await isTagExists(tagName))) {
+    throw new Error(`标签 "${tagName}" 不存在`);
+  }
+
+  try {
+    // 删除本地标签
+    await git.tag(["-d", tagName]);
+    console.log(chalk.green(`本地标签 ${tagName} 已成功删除`));
+
+    // 如果配置了自动推送，则同时删除远程标签
+    if (config.autoPush) {
+      console.log("正在删除远程标签...");
+      try {
+        await git.push(["origin", `:refs/tags/${tagName}`]);
+        console.log(chalk.green(`远程标签 ${tagName} 已成功删除`));
+      } catch (error) {
+        console.error(chalk.red(`删除远程标签失败: ${error.message}`));
+        console.log(
+          chalk.yellow(
+            `你可以稍后使用 git push origin :refs/tags/${tagName} 手动删除远程标签。`
+          )
+        );
+      }
+    } else {
+      console.log(
+        chalk.yellow(
+          `已删除本地标签，但未删除远程标签。使用 git push origin :refs/tags/${tagName} 手动删除远程标签。`
+        )
+      );
+    }
+  } catch (error) {
+    throw new Error(`删除标签失败: ${error.message}`);
+  }
+}
+
 module.exports = {
   createTag,
   listTags,
   loadConfig,
+  removeTag,
 };
