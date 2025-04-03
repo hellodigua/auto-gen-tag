@@ -5,6 +5,7 @@ const { cosmiconfig } = require("cosmiconfig");
 const dotenv = require("dotenv");
 const path = require("path");
 const fs = require("fs");
+const { execSync } = require("child_process");
 
 // 加载环境变量
 dotenv.config();
@@ -72,6 +73,50 @@ async function isGitRepo() {
 }
 
 /**
+ * 将标签模式转换为正则表达式
+ * @param {string} pattern 标签模式
+ * @returns {RegExp} 正则表达式
+ */
+function patternToRegex(pattern) {
+  // 检查是否是日期格式
+  if (pattern.includes("${YYYYMMDD}")) {
+    return new RegExp(
+      "^" +
+        pattern
+          .replace(/\${YYYYMMDD}/g, "\\d{8}") // 简化日期匹配
+          .replace(/\./g, "\\.")
+          .replace(/\-/g, "\\-") +
+        "$"
+    );
+  }
+
+  // 检查是否是简单数字格式
+  if (pattern.includes("${n}")) {
+    return new RegExp(
+      "^" +
+        pattern
+          .replace(/\${n}/g, "\\d{1,5}") // 限制数字长度，避免匹配到日期
+          .replace(/\./g, "\\.")
+          .replace(/\-/g, "\\-") +
+        "$"
+    );
+  }
+
+  // 语义化版本格式
+  return new RegExp(
+    "^" +
+      pattern
+        .replace(/\${major}/g, "\\d+")
+        .replace(/\${minor}/g, "\\d+")
+        .replace(/\${patch}/g, "\\d+")
+        .replace(/\${subPatch}/g, "\\d+")
+        .replace(/\./g, "\\.")
+        .replace(/\-/g, "\\-") +
+      "$"
+  );
+}
+
+/**
  * 获取指定模式的最新标签
  * @param {string} pattern 标签模式
  * @returns {Promise<string|null>} 最新标签或 null
@@ -85,18 +130,7 @@ async function getLatestTag(pattern) {
       return null;
     }
 
-    // 将模式转换为正则表达式
-    const patternRegex = pattern
-      .replace(/\${major}/g, "(\\d+)")
-      .replace(/\${minor}/g, "(\\d+)")
-      .replace(/\${patch}/g, "(\\d+)")
-      .replace(/\${subPatch}/g, "(\\d+)")
-      .replace(/\${YYYYMMDD}/g, "(\\d{8})")
-      .replace(/\${n}/g, "(\\d+)")
-      .replace(/\./g, "\\.")
-      .replace(/\-/g, "\\-");
-
-    const regexPattern = new RegExp(`^${patternRegex}$`);
+    const regexPattern = patternToRegex(pattern);
 
     // 过滤符合模式的标签
     const filteredTags = tags.all.filter((tag) => {
@@ -110,8 +144,10 @@ async function getLatestTag(pattern) {
     // 按语义化版本排序
     filteredTags.sort((a, b) => {
       // 尝试作为语义化版本排序
-      const semverA = semver.valid(semver.clean(a));
-      const semverB = semver.valid(semver.clean(b));
+      const cleanA = a.replace(/^[^\d]+/, ""); // 移除版本号前的前缀
+      const cleanB = b.replace(/^[^\d]+/, "");
+      const semverA = semver.valid(semver.clean(cleanA));
+      const semverB = semver.valid(semver.clean(cleanB));
 
       if (semverA && semverB) {
         return semver.compare(semverB, semverA);
@@ -155,9 +191,16 @@ function incrementVersion(currentVersion, type, pattern) {
   ) {
     // 语义化版本
     const initialVersion = process.env.GENTAG_INITIAL || "0.1.0";
-    const cleaned = currentVersion
-      ? semver.valid(semver.clean(currentVersion))
-      : initialVersion;
+    let cleaned;
+
+    if (currentVersion) {
+      // 提取版本号部分（移除前缀）
+      const versionMatch = currentVersion.match(/\d+\.\d+\.\d+/);
+      cleaned = versionMatch ? versionMatch[0] : initialVersion;
+    } else {
+      cleaned = initialVersion;
+    }
+
     const newVersion = semver.inc(cleaned, type);
     const [major, minor, patch] = newVersion.split(".");
 
@@ -203,6 +246,20 @@ function incrementVersion(currentVersion, type, pattern) {
 }
 
 /**
+ * 检查标签是否存在
+ * @param {string} tag 标签名
+ * @returns {Promise<boolean>} 是否存在
+ */
+async function isTagExists(tag) {
+  try {
+    const tags = await git.tags();
+    return tags.all.includes(tag);
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
  * 创建新标签
  * @param {string} tagEnv 标签环境
  * @param {string} versionType 版本类型
@@ -221,17 +278,28 @@ async function createTag(tagEnv = "default", versionType = "patch", config) {
   }
 
   // 获取最新标签
-  const latestTag = await getLatestTag(tagPattern.replace(/\${.*?}/g, ".*"));
-
-  // 增加版本
-  const versionValues = incrementVersion(latestTag, versionType, tagPattern);
-
-  // 生成新标签
-  const newTag = parseTagPattern(tagPattern, versionValues);
-
+  const latestTag = await getLatestTag(tagPattern);
   console.log(
     `${latestTag ? `当前标签: ${chalk.blue(latestTag)}` : "没有找到匹配的标签"}`
   );
+
+  // 增加版本
+  let versionValues = incrementVersion(latestTag, versionType, tagPattern);
+  let newTag = parseTagPattern(tagPattern, versionValues);
+
+  // 如果标签已存在，继续递增版本直到找到可用的标签
+  let attempts = 0;
+  const maxAttempts = 100; // 防止无限循环
+  while ((await isTagExists(newTag)) && attempts < maxAttempts) {
+    versionValues = incrementVersion(newTag, versionType, tagPattern);
+    newTag = parseTagPattern(tagPattern, versionValues);
+    attempts++;
+  }
+
+  if (attempts >= maxAttempts) {
+    throw new Error("无法生成唯一的标签，请检查版本规则");
+  }
+
   console.log(`新标签: ${chalk.green(newTag)}`);
 
   try {
@@ -239,14 +307,25 @@ async function createTag(tagEnv = "default", versionType = "patch", config) {
     await git.addTag(newTag);
     console.log(chalk.green(`标签 ${newTag} 创建成功！`));
 
-    // 如果配置了自动推送，则推送标签
+    // 如果配置了自动推送，则只推送新创建的标签
     if (config.autoPush) {
       console.log("正在推送标签...");
-      await git.pushTags();
-      console.log(chalk.green("标签推送成功！"));
+      try {
+        await git.push(["origin", `refs/tags/${newTag}`]);
+        console.log(chalk.green("标签推送成功！"));
+      } catch (error) {
+        console.error(chalk.red(`推送标签失败: ${error.message}`));
+        console.log(
+          chalk.yellow(
+            `你可以稍后使用 git push origin refs/tags/${newTag} 手动推送此标签。`
+          )
+        );
+      }
     } else {
       console.log(
-        chalk.yellow("标签已创建但未推送。使用 git push --tags 手动推送。")
+        chalk.yellow(
+          `标签已创建但未推送。使用 git push origin refs/tags/${newTag} 手动推送。`
+        )
       );
     }
   } catch (error) {
@@ -255,93 +334,74 @@ async function createTag(tagEnv = "default", versionType = "patch", config) {
 }
 
 /**
- * 列出标签
- * @param {Object} options 选项
- * @param {Object} config 配置
+ * 获取指定环境的标签列表
+ * @param {string} env 环境名称
+ * @param {object} config 配置对象
+ * @returns {string[]} 标签列表
  */
-async function listTags(options, config) {
-  // 检查是否是 Git 仓库
-  if (!(await isGitRepo())) {
-    throw new Error("当前目录不是 Git 仓库");
+function getTagsByEnv(env, config) {
+  const pattern = config.tagPattern[env];
+  if (!pattern) {
+    return [];
   }
+  const regex = patternToRegex(pattern);
+  const allTags = execSync("git tag", { encoding: "utf-8" })
+    .split("\n")
+    .filter(Boolean);
+  return allTags.filter((tag) => regex.test(tag));
+}
 
-  const limit = parseInt(options.number, 10) || 10;
+/**
+ * 列出标签
+ * @param {object} options 选项
+ * @param {object} config 配置对象
+ */
+function listTags(options, config) {
   const pattern = options.pattern;
-  const verbose = options.verbose;
-
-  try {
-    // 获取所有标签
-    const tags = await git.tags();
-
-    if (!tags.all.length) {
-      console.log(chalk.yellow("仓库中没有标签"));
+  if (pattern) {
+    // 如果指定了模式，则按模式匹配
+    const env = Object.keys(config.tagPattern).find((key) => key === pattern);
+    if (!env) {
+      console.log(`匹配模式 "${pattern}" 的标签:`);
+      console.log("  没有找到标签");
       return;
     }
-
-    // 根据配置的标签模式分组
-    const envPatterns = Object.entries(config.tagPattern);
-    const groupedTags = {};
-
-    // 对于每种环境类型，找到匹配的标签
-    for (const [env, pattern] of envPatterns) {
-      // 将模式转换为正则表达式
-      const patternRegex = pattern
-        .replace(/\${major}/g, "(\\d+)")
-        .replace(/\${minor}/g, "(\\d+)")
-        .replace(/\${patch}/g, "(\\d+)")
-        .replace(/\${subPatch}/g, "(\\d+)")
-        .replace(/\${YYYYMMDD}/g, "(\\d{8})")
-        .replace(/\${n}/g, "(\\d+)")
-        .replace(/\./g, "\\.")
-        .replace(/\-/g, "\\-");
-
-      const regexPattern = new RegExp(`^${patternRegex}$`);
-
-      const matchingTags = tags.all.filter((tag) => {
-        return regexPattern.test(tag);
-      });
-
-      // 按时间排序
-      matchingTags.sort((a, b) => {
-        // 尝试作为语义化版本排序
-        const semverA = semver.valid(semver.clean(a));
-        const semverB = semver.valid(semver.clean(b));
-
-        if (semverA && semverB) {
-          return semver.compare(semverB, semverA);
+    const tags = getTagsByEnv(env, config);
+    console.log(`环境 "${env}" 的标签 (模式: ${config.tagPattern[env]}):`);
+    if (tags.length === 0) {
+      console.log("  没有找到标签");
+    } else {
+      tags.forEach((tag) => {
+        if (options.verbose) {
+          const info = execSync(`git show ${tag} --format="%ai %an" -s`, {
+            encoding: "utf-8",
+          }).trim();
+          console.log(`  ${tag} (${info})`);
+        } else {
+          console.log(`  ${tag}`);
         }
-
-        // 如果不是有效的语义化版本，按字母顺序排序
-        return b.localeCompare(a);
       });
-
-      groupedTags[env] = matchingTags.slice(0, limit);
     }
-
-    // 如果指定了模式，只显示匹配的标签
-    if (pattern) {
-      const filteredTags = tags.all.filter((tag) => tag.includes(pattern));
-      filteredTags.sort((a, b) => b.localeCompare(a));
-
-      console.log(chalk.bold(`匹配模式 "${pattern}" 的标签:`));
-      await displayTags(filteredTags.slice(0, limit), verbose);
-      return;
-    }
-
-    // 显示各环境的标签
-    for (const [env, envTags] of Object.entries(groupedTags)) {
-      if (envTags.length) {
-        console.log(
-          chalk.bold(
-            `\n环境 "${env}" 的标签 (模式: ${config.tagPattern[env]}):`
-          )
-        );
-        await displayTags(envTags, verbose);
-      }
-    }
-  } catch (error) {
-    throw new Error(`列出标签失败: ${error.message}`);
+    return;
   }
+
+  // 如果没有指定模式，则列出所有环境的标签
+  Object.keys(config.tagPattern).forEach((env) => {
+    const tags = getTagsByEnv(env, config);
+    if (tags.length > 0) {
+      console.log(`\n环境 "${env}" 的标签 (模式: ${config.tagPattern[env]}):`);
+      tags.forEach((tag) => {
+        if (options.verbose) {
+          const info = execSync(`git show ${tag} --format="%ai %an" -s`, {
+            encoding: "utf-8",
+          }).trim();
+          console.log(`  ${tag} (${info})`);
+        } else {
+          console.log(`  ${tag}`);
+        }
+      });
+    }
+  });
 }
 
 /**

@@ -6,5 +6,5 @@
     "daily": "v${YYYYMMDD}",
     "simple": "v${n}"
   },
-  "autoPush": false
+  "autoPush": true
 }
