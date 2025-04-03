@@ -1,0 +1,10 @@
+{
+  "tagPattern": {
+    "default": "v${major}.${minor}.${patch}",
+    "test": "test-${major}.${minor}.${patch}",
+    "prod": "release-${major}.${minor}.${patch}",
+    "daily": "v${YYYYMMDD}",
+    "simple": "v${n}"
+  },
+  "autoPush": true
+}
