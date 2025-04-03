@@ -44,7 +44,7 @@ program
 program
   .command("rm")
   .description("删除本地和远程的Git标签")
-  .argument("<tagName>", "要删除的标签名称")
+  .argument("[tagName]", "要删除的标签名称，不提供则删除最新创建的标签")
   .action(async (tagName) => {
     try {
       await removeTag(tagName, config);

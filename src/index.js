@@ -446,8 +446,30 @@ async function displayTags(tags, verbose) {
 }
 
 /**
+ * 获取最新创建的标签
+ * @returns {Promise<string|null>} 最新创建的标签或 null
+ */
+async function getLatestCreatedTag() {
+  try {
+    // 获取所有标签及其创建时间
+    const tagsOutput = execSync(
+      'git for-each-ref --sort=-creatordate --format="%(refname:short)" refs/tags/',
+      {
+        encoding: "utf-8",
+      }
+    ).trim();
+
+    const tags = tagsOutput.split("\n").filter(Boolean);
+    return tags.length > 0 ? tags[0] : null;
+  } catch (error) {
+    console.error(`获取最新标签时出错: ${error.message}`);
+    return null;
+  }
+}
+
+/**
  * 删除本地和远程的Git标签
- * @param {string} tagName 要删除的标签名称
+ * @param {string|null} tagName 要删除的标签名称，如果为null则删除最新创建的标签
  * @param {Object} config 配置
  */
 async function removeTag(tagName, config) {
@@ -456,34 +478,44 @@ async function removeTag(tagName, config) {
     throw new Error("当前目录不是 Git 仓库");
   }
 
+  // 如果未提供标签名，则尝试获取最新创建的标签
+  let targetTag = tagName;
+  if (!targetTag) {
+    targetTag = await getLatestCreatedTag();
+    if (!targetTag) {
+      throw new Error("未找到可删除的标签");
+    }
+    console.log(`将删除最新创建的标签: ${chalk.blue(targetTag)}`);
+  }
+
   // 检查标签是否存在
-  if (!(await isTagExists(tagName))) {
-    throw new Error(`标签 "${tagName}" 不存在`);
+  if (!(await isTagExists(targetTag))) {
+    throw new Error(`标签 "${targetTag}" 不存在`);
   }
 
   try {
     // 删除本地标签
-    await git.tag(["-d", tagName]);
-    console.log(chalk.green(`本地标签 ${tagName} 已成功删除`));
+    await git.tag(["-d", targetTag]);
+    console.log(chalk.green(`本地标签 ${targetTag} 已成功删除`));
 
     // 如果配置了自动推送，则同时删除远程标签
     if (config.autoPush) {
       console.log("正在删除远程标签...");
       try {
-        await git.push(["origin", `:refs/tags/${tagName}`]);
-        console.log(chalk.green(`远程标签 ${tagName} 已成功删除`));
+        await git.push(["origin", `:refs/tags/${targetTag}`]);
+        console.log(chalk.green(`远程标签 ${targetTag} 已成功删除`));
       } catch (error) {
         console.error(chalk.red(`删除远程标签失败: ${error.message}`));
         console.log(
           chalk.yellow(
-            `你可以稍后使用 git push origin :refs/tags/${tagName} 手动删除远程标签。`
+            `你可以稍后使用 git push origin :refs/tags/${targetTag} 手动删除远程标签。`
           )
         );
       }
     } else {
       console.log(
         chalk.yellow(
-          `已删除本地标签，但未删除远程标签。使用 git push origin :refs/tags/${tagName} 手动删除远程标签。`
+          `已删除本地标签，但未删除远程标签。使用 git push origin :refs/tags/${targetTag} 手动删除远程标签。`
         )
       );
     }
@@ -497,4 +529,5 @@ module.exports = {
   listTags,
   loadConfig,
   removeTag,
+  getLatestCreatedTag,
 };
