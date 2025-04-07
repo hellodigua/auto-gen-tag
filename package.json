@@ -1,6 +1,6 @@
 {
   "name": "auto-gen-tag",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "description": "一个智能的 Git 标签自动生成工具，用于简化发版操作流程",
   "main": "src/index.js",
   "bin": {

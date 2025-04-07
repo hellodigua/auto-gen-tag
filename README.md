@@ -32,33 +32,6 @@ gt [配置模式] [版本类型]
 - **配置模式**：对应配置文件中 `tagPattern` 的键名（如 `default`、`test`）
 - **版本类型**：指定要递增的版本部分（`major`、`minor`、`patch`）
 
-### 配置文件
-
-在项目根目录创建 `.gentagrc` 或 `.gentagrc.json` 文件：
-
-```json
-{
-  "tagPattern": {
-    "default": "v${major}.${minor}.${patch}",
-    "test": "test-${major}.${minor}.${patch}",
-    "prod": "release-${major}.${minor}.${patch}",
-    "daily": "v${YYYYMMDD}",
-    "simple": "v${n}"
-  },
-  "autoPush": true
-}
-```
-
-### 环境变量
-
-也可以通过环境变量配置：
-
-```bash
-export GENTAG_PATTERN="v${major}.${minor}.${patch}"
-export GENTAG_INITIAL="v0.1.0"
-export GENTAG_AUTO_PUSH=false
-```
-
 ### 示例
 
 ```bash
@@ -91,6 +64,33 @@ gt rm test-0.1.3
 
 # 删除最近创建的标签
 gt rm
+```
+
+### 配置文件
+
+在项目根目录创建 `.gentagrc` 或 `.gentagrc.json` 文件：
+
+```json
+{
+  "tagPattern": {
+    "default": "v${major}.${minor}.${patch}",
+    "test": "test-${major}.${minor}.${patch}",
+    "prod": "release-${major}.${minor}.${patch}",
+    "daily": "v${YYYYMMDD}",
+    "simple": "v${n}"
+  },
+  "autoPush": true
+}
+```
+
+### 环境变量
+
+也可以通过环境变量配置：
+
+```bash
+export GENTAG_PATTERN="v${major}.${minor}.${patch}"
+export GENTAG_INITIAL="v0.1.0"
+export GENTAG_AUTO_PUSH=false
 ```
 
 ## 其他命令选项
