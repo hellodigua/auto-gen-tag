@@ -1,6 +1,6 @@
 {
   "name": "auto-gen-tag",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "一个智能的 Git 标签自动生成工具，用于简化发版操作流程",
   "main": "src/index.js",
   "bin": {
@@ -35,10 +35,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/yourusername/auto-gen-tag.git"
+    "url": "git+https://github.com/hellodigua/auto-gen-tag.git"
   },
   "bugs": {
-    "url": "https://github.com/yourusername/auto-gen-tag/issues"
+    "url": "https://github.com/hellodigua/auto-gen-tag/issues"
   },
-  "homepage": "https://github.com/yourusername/auto-gen-tag#readme"
+  "homepage": "https://github.com/hellodigua/auto-gen-tag#readme"
 }
